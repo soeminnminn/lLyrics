@@ -368,6 +368,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
                                                  last_item)
 
         self.radio_sources.append(Gtk.SeparatorMenuItem())
+        last_item = self.add_radio_menu_item(self.radio_sources, _("From ID3 tag"), self.scan_selected_source_callback,
+                                 last_item)
         self.add_radio_menu_item(self.radio_sources, _("From cache file"), self.scan_selected_source_callback,
                                  last_item)
 
@@ -544,7 +546,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
         self.scan_source(source, self.clean_artist, self.clean_title)
 
     def scan_next_action_callback(self, action):
-        if self.current_source is None or self.current_source == "From cache file":
+        if self.current_source is None or self.current_source == "From cache file" or self.current_source == "From ID3 tag":
             index = 0
         else:
             index = self.sources.index(self.current_source) + 1
@@ -732,6 +734,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
 
         if source == "From cache file":
             lyrics = self.get_lyrics_from_cache(self.path)
+        elif source == "From ID3 tag":
+            lyrics = self.get_lyrics_from_id3(self.song_path)
         else:
             lyrics = self.get_lyrics_from_source(source, artist, title)
 
@@ -755,11 +759,11 @@ class lLyrics(GObject.Object, Peas.Activatable):
         Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT_IDLE, self.set_menu_sensitive, False)
 
         lyrics = ""
-        if cache:
-            lyrics = self.get_lyrics_from_cache(self.path)
-
-        if lyrics == "":
+        if self.song_path != "":
             lyrics = self.get_lyrics_from_id3(self.song_path)
+
+        if lyrics == "" and cache:
+            lyrics = self.get_lyrics_from_cache(self.path)
 
         if lyrics == "":
             i = 0
@@ -796,7 +800,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
         Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT_IDLE, self.show_lyrics, lyrics)
 
     def get_lyrics_from_id3(self, path):
-        self.current_source = "From ID3"
+        self.current_source = "From ID3 tag"
 
         # try to load lyrics from cache
         if os.path.exists(path):
