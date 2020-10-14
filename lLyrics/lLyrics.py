@@ -30,6 +30,12 @@ from gi.repository import Pango
 from gi.repository import GdkPixbuf
 from gi.repository import GLib
 
+import ALSongLyricsParser
+import BaiduParser
+import KuwoParser
+import MusixmatchParser
+import External
+
 import ChartlyricsParser
 import LyricwikiParser
 import MetrolyricsParser
@@ -96,8 +102,10 @@ LYRICS_TITLE_STRIP = ["\(live[^\)]*\)", "\(acoustic[^\)]*\)", "\([^\)]*mix\)", "
 LYRICS_TITLE_REPLACE = [("/", "-"), (" & ", " and ")]
 LYRICS_ARTIST_REPLACE = [("/", "-"), (" & ", " and ")]
 
-LYRICS_SOURCES = ["Lyricwiki.org", "Letras.terra.com.br", "Metrolyrics.com", "AZLyrics.com", "Lyricsmania.com",
-                  "Vagalume.com.br", "Genius.com", "Darklyrics.com", "Chartlyrics.com"]
+LYRICS_SOURCES = ["Kuwo.cn", "Baidu.com", "Musixmatch", "Lyricwiki.org", "Letras.terra.com.br",
+                  "Metrolyrics.com", "AZLyrics.com", "Lyricsmania.com", "Vagalume.com.br", 
+                  "Genius.com", "Darklyrics.com", "Chartlyrics.com", "lyrics.alsong.co.kr", 
+                  "External"]
 
 
 class lLyrics(GObject.Object, Peas.Activatable):
@@ -116,11 +124,13 @@ class lLyrics(GObject.Object, Peas.Activatable):
         self.appshell = ApplicationShell(self.shell)
 
         # Create dictionary which assigns sources to their corresponding modules
-        self.dict = dict({"Lyricwiki.org": LyricwikiParser, "Letras.terra.com.br": LetrasTerraParser,
+        self.dict = dict({"Kuwo.cn": KuwoParser, "Baidu.com": BaiduParser, "Musixmatch": MusixmatchParser,
+                          "Lyricwiki.org": LyricwikiParser, "Letras.terra.com.br": LetrasTerraParser,
                           "Metrolyrics.com": MetrolyricsParser, "AZLyrics.com": AZLyricsParser,
                           "Lyricsmania.com": LyricsmaniaParser, "Chartlyrics.com": ChartlyricsParser,
                           "Darklyrics.com": DarklyricsParser, "Genius.com": GeniusParser,
-                          "Vagalume.com.br": VagalumeParser})
+                          "Vagalume.com.br": VagalumeParser, "lyrics.alsong.co.kr": ALSongLyricsParser,
+                          "External": External})
         self.add_builtin_lyrics_sources()
 
         # Get the user preferences
@@ -368,6 +378,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
                                                  last_item)
 
         self.radio_sources.append(Gtk.SeparatorMenuItem())
+        last_item = self.add_radio_menu_item(self.radio_sources, _("External"), self.scan_selected_source_callback, last_item)
+        self.radio_sources.append(Gtk.SeparatorMenuItem())
         last_item = self.add_radio_menu_item(self.radio_sources, _("From ID3 tag"), self.scan_selected_source_callback,
                                  last_item)
         self.add_radio_menu_item(self.radio_sources, _("From cache file"), self.scan_selected_source_callback,
@@ -408,6 +420,10 @@ class lLyrics(GObject.Object, Peas.Activatable):
     def add_radio_menu_item(self, menu, label, callback, last):
         group = last.get_group()
         item = Gtk.RadioMenuItem.new_with_label(group, label)
+        if label == _("External"):
+            label = "External"
+        if label == _("From ID3 tag"):
+            label = "From ID3 tag"
         if label == _("From cache file"):
             label = "From cache file"
         item.connect("toggled", callback, label)
@@ -873,7 +889,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
 
         if lyrics != "":
             print("got lyrics from source")
-            lyrics = "%s\n\n(lyrics from %s)" % (lyrics, source)
+            if source != "External" and source != "From ID3 tag":
+                lyrics = "%s\n\n(lyrics from %s)" % (lyrics, source)
 
             if self.cache:
                 self.write_lyrics_to_cache(path, lyrics)

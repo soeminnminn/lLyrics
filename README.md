@@ -25,6 +25,11 @@ Lyrics sources
   - Genius.com
   - Darklyrics.com
   - Chartlyrics.com
+  - Kuwo.cn
+  - Baidu.com
+  - Musixmatch
+  - lyrics.alsong.co.kr
+  - From ID3 tags
 
 It is also possible to retrieve lyrics from the built-in Rhythmbox lyrics plugin, but this is not recommended since it has some bugs and may cause instabilities.
 
