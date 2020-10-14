@@ -17,6 +17,7 @@ import threading
 import webbrowser
 import sys
 import unicodedata
+import urllib.parse
 
 from threading import Thread
 
@@ -39,6 +40,8 @@ import DarklyricsParser
 import GeniusParser
 import VagalumeParser
 import Util
+
+import mutagen
 
 from lLyrics_rb3compat import ActionGroup
 from lLyrics_rb3compat import ApplicationShell
@@ -190,6 +193,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
         self.tag = None
         self.first = None
         self.current_source = None
+        self.song_path = None
         self.artist = None
         self.title = None
         self.clean_artist = None
@@ -273,7 +277,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
 
         self.label = Gtk.Label(_("Lyrics"))
         self.label.set_use_markup(True)
-        self.label.set_padding(3, 10)
+        self.label.set_padding(10, 10)
         self.label.set_alignment(0, 0)
 
         self.menu = self.get_button_menu()
@@ -297,6 +301,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
         self.textview = Gtk.TextView()
         self.textview.set_editable(False)
         self.textview.set_cursor_visible(False)
+        self.textview.set_top_margin(10)
+        self.textview.set_bottom_margin(20)
         self.textview.set_left_margin(10)
         self.textview.set_right_margin(10)
         self.textview.set_pixels_above_lines(5)
@@ -472,6 +478,14 @@ class lLyrics(GObject.Object, Peas.Activatable):
         # get the song data
         self.artist = entry.get_string(RB.RhythmDBPropType.ARTIST)
         self.title = entry.get_string(RB.RhythmDBPropType.TITLE)
+
+        # get song file location
+        location = entry.get_string(RB.RhythmDBPropType.LOCATION)
+        file_match = x = re.findall("^file:\/\/(.*)$", location)
+        if len(file_match) > 0:
+            self.song_path = urllib.parse.unquote(file_match[0])
+        else:
+            self.song_path = ""
 
         print("search lyrics for " + self.artist + " - " + self.title)
 
@@ -745,6 +759,9 @@ class lLyrics(GObject.Object, Peas.Activatable):
             lyrics = self.get_lyrics_from_cache(self.path)
 
         if lyrics == "":
+            lyrics = self.get_lyrics_from_id3(self.song_path)
+
+        if lyrics == "":
             i = 0
             while lyrics == "" and i in range(len(self.sources)):
                 lyrics = self.get_lyrics_from_source(self.sources[i], artist, title)
@@ -777,6 +794,35 @@ class lLyrics(GObject.Object, Peas.Activatable):
         Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT_IDLE, self.set_menu_sensitive, True)
 
         Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT_IDLE, self.show_lyrics, lyrics)
+
+    def get_lyrics_from_id3(self, path):
+        self.current_source = "From ID3"
+
+        # try to load lyrics from cache
+        if os.path.exists(path):
+            lyrics = ""
+            try:
+                file = mutagen.File(path)
+                for k in file.keys():
+                    print('key ' + k)
+                    if k == u"\xa9lyr":
+                        lyrics = file[k][0]
+                        break
+                    elif k.startswith('USLT'):
+                        lyrics = file[k].text
+                        break
+                    # elif k == 'TPE1' or k == u"\xa9ART":
+                    #     artist = file[k][0]
+                    # elif k == 'TIT2' or k == u"\xa9nam":
+                    #     title = file[k][0]
+            except:
+                print("error reading file ID3")
+                return ""
+
+            print("got lyrics from ID3")
+            return lyrics
+
+        return ""
 
     def get_lyrics_from_cache(self, path):
         self.current_source = "From cache file"
@@ -844,7 +890,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
         else:
             lyrics, self.tags = Util.parse_lrc(lyrics)
 
-        self.textbuffer.set_text("%s - %s\n%s" % (self.artist, self.title, lyrics))
+        self.textbuffer.set_text("%s - %s\n%s" % (self.title, self.artist, lyrics))
 
         # make 'artist - title' header bold and underlined 
         start = self.textbuffer.get_start_iter()
