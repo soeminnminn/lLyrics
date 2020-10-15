@@ -329,8 +329,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
         self.textview.set_buffer(self.textbuffer)
 
         # tag to style headers bold and underlined
-        self.tag = self.textbuffer.create_tag(None, underline=Pango.Underline.SINGLE, weight=600,
-                                              pixels_above_lines=10, pixels_below_lines=20)
+        self.tag = self.textbuffer.create_tag(None, size_points=14, size_set=True, weight=600, 
+                                              pixels_above_lines=10, pixels_below_lines=3)
         # tag to highlight synchronized lyrics
         self.sync_tag = self.textbuffer.create_tag(None, weight=600)
 
@@ -589,7 +589,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
 
     def save_to_cache_action_callback(self, action):
         start, end = self.textbuffer.get_bounds()
-        start.forward_lines(1)
+        start.forward_lines(2)
         lyrics = self.textbuffer.get_text(start, end, False)
 
         self.write_lyrics_to_cache(self.path, lyrics)
@@ -621,7 +621,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
         # Enable editing and set cursor
         self.textview.set_cursor_visible(True)
         self.textview.set_editable(True)
-        cursor = self.textbuffer.get_iter_at_line(1)
+        cursor = self.textbuffer.get_iter_at_line(3)
         self.textbuffer.place_cursor(cursor)
         self.textview.grab_focus()
 
@@ -678,7 +678,7 @@ class lLyrics(GObject.Object, Peas.Activatable):
 
         # get lyrics without artist-title header
         start, end = self.textbuffer.get_bounds()
-        start.forward_lines(1)
+        start.forward_lines(2)
         lyrics = self.textbuffer.get_text(start, end, False)
 
         # save edited lyrics to cache file and audio tag
@@ -707,6 +707,8 @@ class lLyrics(GObject.Object, Peas.Activatable):
             self.textbuffer.set_text(self.lyrics_before_edit)
             start = self.textbuffer.get_start_iter()
             end = start.copy()
+            end.forward_to_line_end()
+            end.forward_line()
             end.forward_to_line_end()
             self.textbuffer.apply_tag(self.tag, start, end)
         else:
@@ -825,16 +827,21 @@ class lLyrics(GObject.Object, Peas.Activatable):
                 file = mutagen.File(path)
                 for k in file.keys():
                     print('key ' + k)
-                    if k == u"\xa9lyr":
-                        lyrics = file[k][0]
-                        break
-                    elif k.startswith('USLT'):
+                    if k.startswith('USLT') or k.startswith('SYLT'): # ID3v2.*
                         lyrics = file[k].text
                         break
-                    # elif k == 'TPE1' or k == u"\xa9ART":
-                    #     artist = file[k][0]
-                    # elif k == 'TIT2' or k == u"\xa9nam":
-                    #     title = file[k][0]
+                    elif k == u"\xa9lyr": # iTunes MP4
+                        lyrics = file[k][0]
+                        break
+                    elif k == 'WM/Lyrics': # WMA
+                        lyrics = file[k][0]
+                        break
+                    elif k == 'LYRICS': # Vorbis Comment
+                        lyrics = file[k][0]
+                        break
+                    elif k == 'Lyrics': # APEv2
+                        lyrics = file[k][0]
+                        break
             except:
                 print("error reading file ID3")
                 return ""
@@ -911,11 +918,13 @@ class lLyrics(GObject.Object, Peas.Activatable):
         else:
             lyrics, self.tags = Util.parse_lrc(lyrics)
 
-        self.textbuffer.set_text("%s - %s\n%s" % (self.title, self.artist, lyrics))
+        self.textbuffer.set_text("%s \nby %s\n\n%s" % (self.title, self.artist, lyrics))
 
         # make 'artist - title' header bold and underlined 
         start = self.textbuffer.get_start_iter()
         end = start.copy()
+        end.forward_to_line_end()
+        end.forward_line()
         end.forward_to_line_end()
         self.textbuffer.apply_tag(self.tag, start, end)
 
